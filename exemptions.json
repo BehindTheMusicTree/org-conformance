@@ -1,0 +1,9 @@
+{
+  "concurrency": {
+    "exemptions": {
+      "org-conformance": [
+        {"workflow": "org-conformance.yml", "form": "queue", "reason": "A workflow enforced by an org ruleset must not cancel runs in progress."}
+      ]
+    }
+  }
+}
