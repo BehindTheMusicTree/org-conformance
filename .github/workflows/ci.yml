@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  actionlint:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/actionlint.yml@3c6f2441802eb0c75432ad0c629d9775e652ed8c # v6.7.0
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - run: shellcheck ./*.sh tests/*.sh
+
+      - run: ./check-concurrency.sh --config-only
+
+      - run: ./tests/check-concurrency.sh
+
+      - run: ./tests/check-issue-forms.sh

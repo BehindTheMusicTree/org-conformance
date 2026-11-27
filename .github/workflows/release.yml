@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  release-tag:
+    permissions:
+      contents: write
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@3c6f2441802eb0c75432ad0c629d9775e652ed8c # v6.7.0
+    with:
+      app-id: ${{ vars.RELEASE_APP_ID }}
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+  release-please:
+    needs: release-tag
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml@3c6f2441802eb0c75432ad0c629d9775e652ed8c # v6.7.0
+    with:
+      app-id: ${{ vars.RELEASE_PR_APP_ID }}
+      release-policies: .github/release-policy.json
+      auto-merge: true
+    secrets:
+      release-pr-app-private-key: ${{ secrets.RELEASE_PR_APP_PRIVATE_KEY }}

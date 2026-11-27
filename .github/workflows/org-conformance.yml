@@ -1,0 +1,58 @@
+# Organization conformance, enforced on every repository by the `workflows` rule of an org ruleset.
+# The ruleset (github-config) pins the commit of this file; scripts and data are read at that same
+# commit (job.workflow_sha). It also runs on this repository's own pull requests.
+# - Agent instructions: AGENTS.md/CLAUDE.md adapters checked by the agent-config engine pinned in rules.json.
+# - Workflow concurrency: check-concurrency.sh, with the exemptions of exemptions.json.
+# - Shared issue forms: check-issue-forms.sh; only .github keeps issue templates.
+# Ruleset workflows support only these triggers, ignore their filters and must not cancel runs in progress.
+name: Org conformance
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: org-conformance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  org-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          path: target
+      - name: Check out org-conformance at this workflow's commit
+        uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/org-conformance
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+          path: conformance
+      - name: Read the agent-config pin
+        id: engine
+        run: jq -er '"repo=\(.agent_config.repo)", "sha=\(.agent_config.sha)"' conformance/rules.json >>"$GITHUB_OUTPUT"
+      - name: Check out agent-config
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ steps.engine.outputs.repo }}
+          ref: ${{ steps.engine.outputs.sha }}
+          persist-credentials: false
+          path: agent-config-engine
+      - name: Agent instructions
+        run: python3 agent-config-engine/scripts/check-project-agents.py "$GITHUB_WORKSPACE/target"
+      - name: Workflow concurrency
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: conformance/check-concurrency.sh --local target --repo "$REPO"
+      - name: Shared issue forms
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: conformance/check-issue-forms.sh --local target --repo "$REPO"
